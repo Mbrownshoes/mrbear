@@ -79,25 +79,23 @@ map.addLayer(bing);
 var svg = d3.select(map.getPanes().overlayPane).append("svg");
 var g = svg.append("g").attr("class", "leaflet-zoom-hide");
 
-var parseDate = d3.time.format("%y-%m-%d").parse;
-var parseTime = d3.time.format("%H-%M-%S").parse;
+var parseDate = d3.time.format("%y-%m-%d %H:%M:%S").parse;
 
 // putting d3 code here to access ajax response
 
 d3.json("G008.json", function(error, collection) {
     if (error) return console.error(error);
-console.log(collection)
     bear = topojson.feature(collection, collection.objects.subunits);
     // geojsonLayer.addData(data);
  
     var featuresData = bear.features.filter(
         function(d) {
-            // console.log(parseDate(d.properties.loc_date) > parseDate("05-12-31") && parseDate(d.properties.loc_date) < parseDate("07-01-01"))
-            return parseDate(d.properties.loc_date) > parseDate("05-12-31") && parseDate(d.properties.loc_date) < parseDate("07-01-01")
+        
+            return parseDate(d.properties.timestamp) > parseDate("05-12-31 00:00:00") && parseDate(d.properties.timestamp) < parseDate("07-01-01 00:00:00")
             // console.log(d.properties.catalognumber =="KNTM-2546")
         })
-    console.log(featuresData)
-    // console.log(featuresData)
+
+
     var transform = d3.geo.transform({
         point: projectPoint
     });
@@ -127,13 +125,15 @@ console.log(collection)
         .attr("class", "travelMarker");
 
 
+    
+
     var timedate = d3.time.scale()
                         .range([1,120000])
                         .domain([
-                            d3.min(flock, function(d) {return d3.time.format("%Y-%m-%d %H:%M:%S.%L").parse(d.properties.datetime); }),
-                            d3.max(flock, function(d) {return d3.time.format("%Y-%m-%d %H:%M:%S.%L").parse(d.properties.datetime); })
+                            d3.min(featuresData, function(d) {return parseDate(d.properties.timestamp); }),
+                            d3.max(featuresData, function(d) {return parseDate(d.properties.timestamp); })
                         ]);
-            
+
     //need to reset when zooming
     map.on("viewreset",reset);
     reset();
@@ -170,8 +170,13 @@ console.log(collection)
             g.attr("transform", "translate(" + (-topLeft[0] + 50) + "," + (-topLeft[1] + 50) + ")");
     }// end reset
     function transition() {
+        console.log('hi')
         linePath.transition()
-            .duration(1600000)
+            .duration(1000000)
+            .delay(function(d, i) {
+                console.log(i)
+                return timedate(parseDate(d[i].properties.timestamp));
+            })
             .ease("linear")
             .attrTween("stroke-dasharray", tweenDash);
             // .each("end", function() {
@@ -188,7 +193,7 @@ console.log(collection)
             var p = linePath.node().getPointAtLength(t * l);
             // move the marker to that point
             marker.attr("transform", "translate(" + p.x + "," + p.y + ")");
-        console.log(tweenToggle)
+        // console.log(tweenToggle)
             if (tweenToggle == 0 | tweenToggle == 5) {
                     tweenToggle = 1;
                     var newCenter = map.layerPointToLatLng(new L.Point(p.x,p.y));

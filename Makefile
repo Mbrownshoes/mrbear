@@ -5,5 +5,5 @@
 G008.json: build/subunits.json
 	node_modules/.bin/topojson \
 	-o $@ \
-	-p Bears_ID,loc_date,full_date \
+	-p Bears_ID,timestamp \
 	-- $<
