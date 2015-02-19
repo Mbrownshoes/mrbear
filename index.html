@@ -123,7 +123,7 @@
 <button id="g-play-button">Pause</button>
 <div id="slider"></div>
 <script>
-// var tweenToggle = 0;
+var tweenToggle = 0;
 
 var width = 970,
     height = 500,
@@ -146,7 +146,7 @@ var basemap = new L.tileLayer('http://otile1.mqcdn.com/tiles/1.0.0/map/{z}/{x}/{
 //create map object
 var map = L.map('map')
     .addLayer(basemap)
-    .setView([53, -123.1], 10);
+    .setView([53, -123.1], 14);
 // var geojsonLayer = new L.GeoJSON();
 var bing = new L.BingLayer("AhjCmC4ThYrtk-3i-01G6buMsQBPOi0SfZO6CCOyhbd1XTHSkI1T_00AZiCBL1HV");
 map.addLayer(bing);
@@ -310,31 +310,33 @@ path = d3.geo.path().projection(transform);
 
 
     var boats = [],
-        cords = [];
+        cords = [],
+        ind=[];
 
-    featuresData.forEach(function(d) {
+    featuresData.forEach(function(d,i) {
         cords.push(d.LatLng)
         timeStamp.push(parseDate(d.properties.timestamp))
+        ind.push(i)
     })
 
-    
+    console.log(ind)
 
     boats.push({
         type: "LineString",
         id: "mrbear",
         coordinates: cords,
-        indx: timeStamp
+        indx: ind
     })
 
     dateTime = d3.time.scale()
-        .range([0, width])
+        .range([0, timeStamp.length])
         .domain([d3.min(timeStamp), d3.max(timeStamp)]);
 
     minValue = trailLength;
     maxValue = currentValue = targetValue = featuresData.length - 1;
 
     x.domain([minValue, maxValue]);
-    xAxis.tickValues(d3.range(0, targetValue, 1000).concat(-180, d3.keys(xTicks)));
+    xAxis.tickValues(d3.range(0, targetValue, 500).concat(-180, d3.keys(xTicks)));
 
 
     sliderContainer.append("g")
@@ -494,7 +496,7 @@ function brushed() {
         currentValue = brush.extent()[0];
         handle.attr("cx", x(currentValue));
         // var i = currentValue;
-
+        console.log(currentValue)
         var j = Math.round(currentValue);
 
         if (j === minValue) {
@@ -503,7 +505,7 @@ function brushed() {
             boat.attr({
                 transform: function(d) {
                     console.log(d.coordinates[j])
-                    var coord = map.latLngToLayerPoint(new L.LatLng(d.coordinates[j].lat, d.coordinates[j].lng));
+                    var coord = map.latLngToLayerPoint(new L.LatLng(d.coordinates[d.indx.indexOf(j)].lat, d.coordinates[d.indx.indexOf(j)].lng));
                         // console.log(coord)
                             //var coord = d.stream.point(point.x, point.y);
                         return "translate(" + coord.x + "," + coord.y + ")"
@@ -515,19 +517,29 @@ function brushed() {
             boat.transition()
                 .delay(function(d) {
                     console.log(j)
-                    console.log(timeStamp[j])
-                    return dateTime(timeStamp[j]);
+                    console.log(d.indx.indexOf(j))
+                    console.log(timeStamp[d.indx.indexOf(j)])
+                    return dateTime(timeStamp[d.indx.indexOf(j)]);
                 })
                 .ease("linear")
                 .attr({
                     transform: function(d) {
                         // console.log(d.coordinates[j])
-                            var coord = map.latLngToLayerPoint(new L.LatLng(d.coordinates[j].lat, d.coordinates[j].lng));
+                            var coord = map.latLngToLayerPoint(new L.LatLng(d.coordinates[d.indx.indexOf(j)].lat, d.coordinates[d.indx.indexOf(j)].lng));
                         // console.log(coord)
                             return "translate(" + coord.x + "," + coord.y + ")"
                         
                     }
                 });
+
+            if (tweenToggle == 0 | tweenToggle == 5) {
+                    tweenToggle = 1;
+                    var newCenter = map.layerPointToLatLng(new L.Point(p.x,p.y));
+                    //map.setView(newCenter, 14);
+                    map.panTo(newCenter, 14);
+                } else {
+                    tweenToggle++;
+                }    
         }
 
 
