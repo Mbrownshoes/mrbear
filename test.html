@@ -1,3 +1,4 @@
+ 
 <!DOCTYPE html>
 <meta charset="utf-8">
 <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.5/leaflet.css" />
@@ -8,51 +9,32 @@
 <script src="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.2/leaflet.js"></script>
 <script src="pluggins/leaflet-plugins-1.2.1/layer/tile/Bing.js"></script>
 <script src="http://code.jquery.com/jquery-1.10.2.min.js"></script>
-<link rel="stylesheet" href="main.css">
-
 <style>
-    #g-play-button {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        background: rgb(116, 173, 209);
-        padding-right: 26px;
-        border-radius: 2px;
-        border: none;
-        color: white;
+ html,
+    body {
+        height: 100%;
+        width: 100%;
+    }
+    body {
         margin: 0;
-        padding: 0 12px;
-        width: 68px;
-        cursor: pointer;
-        height: 30px;
-        font: 13px sans-serif;
     }
-    
-    #g-play-button:hover {
-        background-color: rgb(69, 117, 180);
-    }
-    
     #map {
-        width: 970px;
-        height: 500px;
-        background: #ddd;
+        width: 100%;
+        height: 100%;
     }
-    
     svg {
         position: relative;
     }
-    
     path {
         fill: yellow;
         stroke-width: 2px;
         stroke: red;
         stroke-opacity: 1;
     }
-    
     .travelMarker {
         fill: yellow;
+        opacity: 0.75;
     }
-    
     .waypoints {
         fill: black;
         opacity: 0;
@@ -65,8 +47,9 @@
 .lineConnect {
     fill: none;
     stroke: #e5f5e0;
-    stroke-linejoin: round;
-    stroke-linecap: round;
+    stroke-opacity: .2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 .locnames {
     fill: black;
@@ -74,518 +57,182 @@
     font-weight: bold;
     font-size: 13px;
 }
-/*.g-slider  {
-    position: absolute;
-    left: 20px;
-    top: 360px;
-    font-size: 0.8em;
-}*/
-
-.axis .domain {
-    fill: none;
-    stroke: #000;
-    stroke-opacity: .3;
-    stroke-width: 10px;
-    stroke-linecap: round;
-}
-.tick line {
-    stroke: #aaa;
-    shape-rendering: crispEdges;
-}
-.g-boat circle {
-    stroke: #000;
-    stroke-width: 3px;
-}
-.axis .halo {
-    fill: none;
-    stroke: #ccc;
-    stroke-width: 8px;
-    stroke-linecap: round;
-}
-.g-slider {
-    fill: white;
-}
-.g-slider .background {
-    cursor: ew-resize !important;
-}
-.handle{
-    fill:#fff;
-     stroke: #000;
-  stroke-width: 1.0px;
-  pointer-events: none;
-}
-
 </style>
-
 <body>
-<h1>Grizzly</h1>
-<div id="map" class="map"></div>
-<button id="g-play-button">Pause</button>
-<div id="slider"></div>
+<div id="map"></div>
 <script>
-// var tweenToggle = 0;
+var tweenToggle = 0;
 
-var width = 970,
-    height = 500,
-    brushHeight = 60;
 
-var moving,
-    minValue,
-    maxValue,
-    currentValue,
-    targetValue,
-    trailLength = 10,
-    alpha = .25;
-
-var playButton = d3.select("#g-play-button");
-
-var basemap = new L.tileLayer('http://otile1.mqcdn.com/tiles/1.0.0/map/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'
+var basemap = new L.tileLayer('http://otile1.mqcdn.com/tiles/1.0.0/map/{z}/{x}/{y}.png',{
+  attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'
 });
-
 //create map object
 var map = L.map('map')
     .addLayer(basemap)
-    .setView([53, -123.1], 10);
+    .setView([53, -123.1], 14);
 // var geojsonLayer = new L.GeoJSON();
 var bing = new L.BingLayer("AhjCmC4ThYrtk-3i-01G6buMsQBPOi0SfZO6CCOyhbd1XTHSkI1T_00AZiCBL1HV");
 map.addLayer(bing);
 
 
 var svg = d3.select(map.getPanes().overlayPane).append("svg");
-
 var g = svg.append("g").attr("class", "leaflet-zoom-hide");
 
 var parseDate = d3.time.format("%y-%m-%d %H:%M:%S").parse;
 
-var slider,
-    handle;
-var format = d3.time.format("%x");
-
-var margin = {
-    top: 10,
-    right: 10,
-    bottom: 10,
-    left: 100
-}
-
-var sliderWidth = 800,
-    sliderHeight = 30;
-
-var x = d3.scale.linear()
-    .range([0, sliderWidth])
-    .clamp(true);
-
-var xTicks = {
-    "0": "Tagged"
-};
-
-
-var sliderContainer = d3.select("#slider").append("svg")
-    .attr("width", sliderWidth + margin.left + margin.right + 10)
-    .attr("height", sliderHeight + margin.top + margin.bottom)
-    .append("g")
-    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
-var linePath,
-    dateTime,
-    marker,
-    ptFeatures;
-
-var brush = d3.svg.brush()
-    .x(x)
-    .extent([0, 0])
-    .on("brush", brushed);
-
-svg = d3.select(".map").append("svg")
-    .attr("width", width)
-    .attr("height", height);
-
-var xAxis = d3.svg.axis()
-    .scale(x)
-    .orient("bottom")
-    .tickFormat(function(t) {
-        // console.log(featuresData[t].properties.timestamp)
-        return xTicks[t] || format(timeStamp[t])
-    })
-    .tickSize(12, 0)
-    .tickPadding(0);
-
-var timeStamp = [];
+// putting d3 code here to access ajax response
 
 d3.json("G008.json", function(error, collection) {
     if (error) return console.error(error);
-var transform = d3.geo.transform({point: projectPoint}),
-
-path = d3.geo.path().projection(transform);
     bear = topojson.feature(collection, collection.objects.subunits);
     // geojsonLayer.addData(data);
-
-    // var feature = g.selectAll("path")
-    //     .data(bear.features)
-    //     .enter()
-    //     .append("path");
-
-    // feature.attr("d", path)
-    //     .style("fill","blue");
-
-
-//                 var bounds = path.bounds(bear),
-//             topLeft = bounds[0],
-//             bottomRight = bounds[1];
-//             // console.log((rawData))
-
-//         svg.attr("width", bottomRight[0] - topLeft[0])
-//             .attr("height", bottomRight[1] - topLeft[1])
-//             .style("left", topLeft[0] + "px")
-//             .style("top", topLeft[1] + "px");
-
-// feature.attr("d", path);
+ 
     var featuresData = bear.features.filter(
         function(d) {
-
+        
             return parseDate(d.properties.timestamp) > parseDate("05-12-31 00:00:00") && parseDate(d.properties.timestamp) < parseDate("07-01-01 00:00:00")
-                // console.log(d.properties.catalognumber =="KNTM-2546")
+            // console.log(d.properties.catalognumber =="KNTM-2546")
         })
 
-    featuresData.forEach(function(d) {
-        d.LatLng = new L.LatLng(d.geometry.coordinates[1], d.geometry.coordinates[0])
+
+    var transform = d3.geo.transform({
+        point: projectPoint
     });
-
-    // var transform = d3.geo.transform({
-    //     point: projectPoint
-    // });
+    var d3path = d3.geo.path().projection(transform);
+    var toLine = d3.svg.line()
+        .interpolate("linear")
+        .x(function(d) {
+            return applyLatLngToLayer(d).x
+        })
+        .y(function(d){
+            return applyLatLngToLayer(d).y
+        });
+    var ptFeatures = g.selectAll("circle")
+        .data(featuresData)
+        .enter()
+        .append("circle")
+        .attr("r", 3)
+        .attr("class", "waypoints");
+    var linePath = g.selectAll(".lineConnect")
+        .data([featuresData])
+        .enter()
+        .append("path")
+        .attr("class", "lineConnect");
+    var marker = g.append("circle")
+        .attr("r", 7)
+        .attr("id","marker")
+        .attr("class", "travelMarker");
 
 
     
 
-    // var gX = svg.append("g")
-    //     .attr("class", "g-x g-axis")
-    //     .attr("transform", "translate(0," + brushHeight / 2 + ")")
-    //     .call(xAxis);
+    var timedate = d3.time.scale()
+                        .range([1,120000])
+                        .domain([
+                            d3.min(featuresData, function(d) {return parseDate(d.properties.timestamp); }),
+                            d3.max(featuresData, function(d) {return parseDate(d.properties.timestamp); })
+                        ]);
 
-    // gX.select(".domain")
-    //     .select(function() { return this.parentNode.insertBefore(this.cloneNode(true), this); })
-    //     .attr("class", "g-halo");
-
-    // var tick = gX.selectAll(".tick")
-    //     .each(function() { this.parentNode.appendChild(this); });
-
-    // tick.select("line")
-    //     .attr("y1", -8)
-    //     .attr("y2", 8);
-
-
-
-
-
-    // var d3path = d3.geo.path().projection(transform);
-    // var toLine = d3.svg.line()
-    //     .interpolate("linear")
-    //     .x(function(d) {
-    //         return applyLatLngToLayer(d).x
-    //     })
-    //     .y(function(d){
-    //         return applyLatLngToLayer(d).y
-    //     });
-    //  // ptFeatures = g.selectAll("circle")
-    //  //    .data(featuresData)
-    //  //    .enter()
-    //  //    .append("circle")
-    //  //    .attr("r", 3)
-    //  //    .attr("class", "waypoints");
-
-    // linePath = g.selectAll(".lineConnect")
-    //     .data([featuresData])
-    //     .enter()
-    //     .append("path")
-    //     .attr("class", "lineConnect");
-
-    // marker = g.append("circle")
-    //    .data(featuresData)
-    //    .enter()
-    //    .append("circle")
-    //    .attr("r", 7)
-    //    .attr("class", "travelMarker");
-
-
-    var boats = [],
-        cords = [];
-
-    featuresData.forEach(function(d) {
-        cords.push(d.LatLng)
-        timeStamp.push(parseDate(d.properties.timestamp))
-    })
-
-    
-
-    boats.push({
-        type: "LineString",
-        id: "mrbear",
-        coordinates: cords,
-        indx: timeStamp
-    })
-
-    dateTime = d3.time.scale()
-        .range([0, width])
-        .domain([d3.min(timeStamp), d3.max(timeStamp)]);
-
-    minValue = trailLength;
-    maxValue = currentValue = targetValue = featuresData.length - 1;
-
-    x.domain([minValue, maxValue]);
-    xAxis.tickValues(d3.range(0, targetValue, 1000).concat(-180, d3.keys(xTicks)));
-
-
-    sliderContainer.append("g")
-        .attr("class", "x axis")
-        .attr("transform", "translate(0," + sliderHeight / 2 + ")")
-        .call(xAxis)
-        .select(".domain")
-        .select(function() {
-            return this.parentNode.appendChild(this.cloneNode(true));
-        })
-        .attr("class", "halo");
-
-    sliderContainer.call(xAxis)
-
-    slider = sliderContainer.append("g")
-        .attr("class", "g-slider")
-        .call(brush);
-
-    slider.selectAll(".extent, .resize").remove();
-
-    slider.select(".background")
-        .attr("height", sliderHeight);
-
-    handle = slider.append("circle")
-        .attr("class", "handle")
-        .attr("transform", "translate(0," + sliderHeight / 2 + ")")
-        .attr("r", 9);
-
-
-
-
-    boat = svg.selectAll(".g-boat")
-        .data(boats)
-        .enter().append("g")
-        .attr("class", function(d) {
-            return "g-boat g-boat-" + d.id;
-        })
-
-    boat.append("circle").attr("r", 7)
-        .style("fill", "blue");
-
-    d3.select(window)
-        .on("keydown", keydowned);
-
- 
     //need to reset when zooming
-    // map.on("viewreset",reset);
-    // reset();
+    map.on("viewreset",reset);
+    reset();
+    transition();
 
+    function reset() {
+        console.log(d3path.bounds(bear))
+        var bounds = d3path.bounds(bear),
+            topLeft = bounds[0],
+            bottomRight = bounds[1];
+        ptFeatures.attr("transform",
+                function(d) {
+                    return "translate(" +
+                        applyLatLngToLayer(d).x + "," +
+                        applyLatLngToLayer(d).y + ")";
+                });
+        marker.attr("transform",
+            function() {
+                var y = featuresData[0].geometry.coordinates[1]
+                console.log(y)
+                var x = featuresData[0].geometry.coordinates[0]
+                return "translate(" +
+                    map.latLngToLayerPoint(new L.LatLng(y, x)).x + "," +
+                    map.latLngToLayerPoint(new L.LatLng(y, x)).y + ")";
+            });
+        // Setting the size and location of the overall SVG container
+            svg.attr("width", bottomRight[0] - topLeft[0] + 120)
+                .attr("height", bottomRight[1] - topLeft[1] + 120)
+                .style("left", topLeft[0] - 50 + "px")
+                .style("top", topLeft[1] - 50 + "px");
+            // linePath.attr("d", d3path);
+            linePath.attr("d", toLine)
+            // ptPath.attr("d", d3path);
+            g.attr("transform", "translate(" + (-topLeft[0] + 50) + "," + (-topLeft[1] + 50) + ")");
+    }// end reset
+    function transition() {
+        console.log('hi')
+        linePath.transition()
+            .duration(1000000)
+            .delay(function(d, i) {
+                console.log(i)
+                return timedate(parseDate(d[i].properties.timestamp));
+            })
+            .ease("linear")
+            .attrTween("stroke-dasharray", tweenDash);
+            // .each("end", function() {
+            //  d3.select(this).call(transition);
+            // });
+    }
+    //this function feeds the attrTween operator above with the stroke and dash lengths
+    function tweenDash() {
+        return function(t) {
+            // console.log(t)
+            var l = linePath.node().getTotalLength();
+            interpolate = d3.interpolateString("0," + l, l + "," + l);
+            var marker = d3.select("#marker");
+            var p = linePath.node().getPointAtLength(t * l);
+            // move the marker to that point
+            marker.attr("transform", "translate(" + p.x + "," + p.y + ")");
+        // console.log(tweenToggle)
+            if (tweenToggle == 0 | tweenToggle == 5) {
+                    tweenToggle = 1;
+                    var newCenter = map.layerPointToLatLng(new L.Point(p.x,p.y));
+                    //map.setView(newCenter, 14);
+                    map.panTo(newCenter, 14);
+                } else {
+                    tweenToggle++;
+                }
+            
 
-    // function reset() {
-    //     var bounds = d3path.bounds(bear),
-    //         topLeft = bounds[0],
-    //         bottomRight = bounds[1];
-    //     // ptFeatures.attr("transform",
-    //     //         function(d) {
-    //     //             return "translate(" +
-    //     //                 applyLatLngToLayer(d).x + "," +
-    //     //                 applyLatLngToLayer(d).y + ")";
-    //     //         });
-    //     // marker.attr("transform",
-    //     //     function() {
-    //     //         var y = featuresData[0].geometry.coordinates[1]
-    //     //         // console.log(y)
-    //     //         var x = featuresData[0].geometry.coordinates[0]
-    //     //         return "translate(" +
-    //     //             map.latLngToLayerPoint(new L.LatLng(y, x)).x + "," +
-    //     //             map.latLngToLayerPoint(new L.LatLng(y, x)).y + ")";
-    //     //     });
-    //     // Setting the size and location of the overall SVG container
-    //         svg.attr("width", bottomRight[0] - topLeft[0] + 120)
-    //             .attr("height", bottomRight[1] - topLeft[1] + 120)
-    //             .style("left", topLeft[0] - 50 + "px")
-    //             .style("top", topLeft[1] - 50 + "px");
-    //         // linePath.attr("d", d3path);
-            // linePath.attr("d", toLine)
-    //         // ptPath.attr("d", d3path);
-    //         g.attr("transform", "translate(" + (-topLeft[0] + 50) + "," + (-topLeft[1] + 50) + ")");
-    // }// end reset
-
-
-
+            return interpolate(t);
+        }
+    }
     function projectPoint(x, y) {
             var point = map.latLngToLayerPoint(new L.LatLng(y, x));
             this.stream.point(point.x, point.y);
         } //end projectPoint
-
-    playButton
-        .on("click", paused)
-        .each(paused);
-
 });
-
-// similar to projectPoint this function converts lat/long to
-// svg coordinates except that it accepts a point from our 
-// GeoJSON
-// function applyLatLngToLayer(d) {
-//     var y = d.geometry.coordinates[1]
-//     var x = d.geometry.coordinates[0]
-//     return map.latLngToLayerPoint(new L.LatLng(y,x))
-// }
-
-
-function paused() {
-    // console.log(slider.node())
-    if (slider.node().__transition__) {
-        slider.interrupt();
-        this.textContent = "Play";
-    } else {
-        // console.log(minValue)
-        if (currentValue === maxValue) slider
-            .call(brush.extent([currentValue = minValue, currentValue]))
-            .call(brush.event)
-            .call(brushBackground);
-
-        targetValue = maxValue;
-        var i = Math.round(currentValue);
-
-        slider.transition()
-            .duration((targetValue - currentValue) / (targetValue - minValue) * 40000)
-            .ease("linear")
-            .call(brush.extent([targetValue, targetValue]))
-            .call(brush.event)
-            .call(brushBackground);
-
-        this.textContent = "Pause";
-    }
-}
-
-function keydowned() {
-    if (d3.event.metaKey || d3.event.altKey) return;
-    switch (d3.event.keyCode) {
-        case 37:
-            targetValue = Math.max(x.domain()[0], currentValue - trailLength);
-            break;
-        case 39:
-            targetValue = Math.min(x.domain()[1], currentValue + trailLength);
-            break;
-        default:
-            return;
-    }
-    playButton.text("Play");
-    slider.interrupt();
-    move();
-    d3.event.preventDefault();
+    // similar to projectPoint this function converts lat/long to
+    // svg coordinates except that it accepts a point from our 
+    // GeoJSON
+function applyLatLngToLayer(d) {
+    var y = d.geometry.coordinates[1]
+    var x = d.geometry.coordinates[0]
+    return map.latLngToLayerPoint(new L.LatLng(y,x))
 }
 
 
-function brushed() {
-    if (d3.event.sourceEvent) { // not a programmatic event
-        if (d3.event.sourceEvent.target.parentNode === this) { // clicked on the brush
-            playButton.text("Play");
-            targetValue = x.invert(d3.mouse(this)[0]);
-            move();
-        }
-    } else {
-        currentValue = brush.extent()[0];
-        handle.attr("cx", x(currentValue));
-        // var i = currentValue;
-
-        var j = Math.round(currentValue);
-
-        if (j === minValue) {
-            console.log(minValue)
-
-            boat.attr({
-                transform: function(d) {
-                    console.log(d.coordinates[j])
-                    var coord = map.latLngToLayerPoint(new L.LatLng(d.coordinates[j].lat, d.coordinates[j].lng));
-                        // console.log(coord)
-                            //var coord = d.stream.point(point.x, point.y);
-                        return "translate(" + coord.x + "," + coord.y + ")"
-                    }
-            });
-
-        } else {
-            // everything brush this starts again.its only meant to run
-            boat.transition()
-                .delay(function(d) {
-                    console.log(j)
-                    console.log(timeStamp[j])
-                    return dateTime(timeStamp[j]);
-                })
-                .ease("linear")
-                .attr({
-                    transform: function(d) {
-                        // console.log(d.coordinates[j])
-                            var coord = map.latLngToLayerPoint(new L.LatLng(d.coordinates[j].lat, d.coordinates[j].lng));
-                        // console.log(coord)
-                            return "translate(" + coord.x + "," + coord.y + ")"
-                        
-                    }
-                });
-        }
-
-
-        //this function feeds the attrTween operator above with the stroke and dash lengths
-        // function tweenDash() {
-        //     return function(t) {
-        //         // console.log(t)
-        //         var l = linePath.node().getTotalLength();
-        //         interpolate = d3.interpolateString("0," + l, l + "," + l);
-        //         var marker = d3.select("#marker");
-        //         var p = linePath.node().getPointAtLength(t * l);
-        //         // console.log(p)
-        //         // move the marker to that point
-        //         marker.attr("transform", "translate(" + p.x + "," + p.y + ")");
-        //     // console.log(tweenToggle)
-        //         // if (tweenToggle == 0 | tweenToggle == 5) {
-        //         //         tweenToggle = 1;
-        //         //         var newCenter = map.layerPointToLatLng(new L.Point(p.x,p.y));
-        //         //         //map.setView(newCenter, 14);
-        //         //         map.panTo(newCenter, 14);
-        //         //     } else {
-        //         //         tweenToggle++;
-        //         //     }
-
-
-        //         return interpolate(t);
-        //     }
-        // }
-    }
-}
-
-function brushBackground() {
-    slider.select(".background")
-        .attr("x", -40)
-        .attr("width", width + 40);
-}
-
-function move() {
-        var copyValue = currentValue; // detect interrupt
-
-        if (moving) return false;
-        moving = true;
-
-        d3.timer(function() {
-            if (copyValue !== currentValue) return !(moving = false);
-
-            copyValue = currentValue = Math.abs(currentValue - targetValue) < 1e-3 ? targetValue : targetValue * alpha + currentValue * (1 - alpha);
-            // console.log(currentValue)
-            slider
-                .call(brush.extent([currentValue, currentValue]))
-                .call(brush.event)
-                .call(brushBackground);
-
-            return !(moving = currentValue !== targetValue);
-        });
-    }
-        // map.addLayer(geojsonLayer);
-function type(d) {
-    return [+d.x, +d.y];
-}        
+// map.addLayer(geojsonLayer);
 </script>
+
+
+
+
+
+
+
+
+
+
+
+
